@@ -2,7 +2,9 @@
 
 fname = ARGV[0]
 
-def get_box_info(f, start=0, size=f.size)
+def get_box_info(f, info=[0, f.size])
+	(start, size) = info
+
 	boxes = Hash.new{|h,k| h[k] = [] }
 
 	pos = start
@@ -48,5 +50,11 @@ File.open(fname) {|f|
 		puts "Compatible brands are #{compat_brands.inspect}"
 	else
 		puts "File does not have an 'ftyp' box"
+	end
+
+	if boxes.has_key? 'moov'
+		mboxes = get_box_info(f, boxes['moov'][0])
+	else
+		puts "File does not have a 'moov' box"
 	end
 }
