@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
 fname = ARGV[0]
+boxes = Hash.new{|h,k| h[k] = [] }
 
 File.open(fname) {|f|
 	fsize = f.size
@@ -20,8 +21,25 @@ File.open(fname) {|f|
 			bsize -= 8
 		end
 		puts "Got box size=#{bsize}, type=#{type.inspect}"
+		boxes[type] << [pos, bsize]
 		pos += bsize
 		f.seek(pos)
 	end
 	puts "Ended at pos=#{pos}, fsize=#{fsize}, diff=#{fsize-pos}"
+
+	get_box = lambda {|array|
+		f.seek(array[0])
+		f.read(array[1])
+	}
+
+	if boxes.has_key? 'ftyp'
+		ftyp = get_box.call(boxes['ftyp'][0])
+		major_brand = ftyp[0...4]
+		minor_version = ftyp[4...8].unpack('L>')[0]
+		compat_brands = ftyp[8..-1].scan(/.{4}/m)
+		puts "Brand is #{major_brand.inspect} version #{minor_version}"
+		puts "Compatible brands are #{compat_brands.inspect}"
+	else
+		puts "File does not have an 'ftyp' box"
+	end
 }
