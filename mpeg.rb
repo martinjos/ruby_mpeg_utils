@@ -54,6 +54,16 @@ File.open(fname) {|f|
 
 	if boxes.has_key? 'moov'
 		mboxes = get_box_info(f, boxes['moov'][0])
+
+		if mboxes.has_key? 'mvhd'
+			mvhd = get_box.call(mboxes['mvhd'][0])
+			version = mvhd[0].ord
+			flags = mvhd[0...4].unpack('L>')[0] | 0xffffff
+			puts "Got 'mvhd' version #{version}"
+			p matrix = mvhd[36...72].unpack('L>9')
+		else
+			puts "File does not have a moov:mvhd box"
+		end
 	else
 		puts "File does not have a 'moov' box"
 	end
