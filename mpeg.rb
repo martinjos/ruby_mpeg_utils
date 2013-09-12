@@ -1,5 +1,7 @@
 #!/usr/bin/env ruby
 
+require 'matrix'
+
 fname = ARGV[0]
 
 def get_box_info(f, info=[0, f.size])
@@ -33,16 +35,39 @@ def get_box_info(f, info=[0, f.size])
 	boxes
 end
 
-File.open(fname) {|f|
+def get_box(f, array)
+	f.seek(array[0])
+	f.read(array[1])
+end
+
+def read_bytes(f, pos, size)
+	f.seek(pos)
+	f.read(size)
+end
+
+def write_bytes(f, pos, bytes)
+	f.seek(pos)
+	f.write(bytes)
+end
+
+def rot_mat(f, pos, do_rot)
+	bytes = read_bytes(f, pos, 9*4)
+	matrix = Matrix.rows bytes.unpack('l>9').each_slice(3).to_a
+	p matrix
+	if do_rot
+		rot = Matrix.rows [[0, -1, 0], [1, 0, 0], [0, 0, 1]]
+		newmat = rot * matrix
+		p rot
+		p newmat
+		write_bytes(f, pos, newmat.to_a.flatten.pack('l>9'))
+	end
+end
+
+File.open(fname, "r+") {|f|
 	boxes = get_box_info(f)
 
-	get_box = lambda {|array|
-		f.seek(array[0])
-		f.read(array[1])
-	}
-
 	if boxes.has_key? 'ftyp'
-		ftyp = get_box.call(boxes['ftyp'][0])
+		ftyp = get_box(f, boxes['ftyp'][0])
 		major_brand = ftyp[0...4]
 		minor_version = ftyp[4...8].unpack('L>')[0]
 		compat_brands = ftyp[8..-1].scan(/.{4}/m)
@@ -56,14 +81,29 @@ File.open(fname) {|f|
 		mboxes = get_box_info(f, boxes['moov'][0])
 
 		if mboxes.has_key? 'mvhd'
-			mvhd = get_box.call(mboxes['mvhd'][0])
+			mvhd = get_box(f, mboxes['mvhd'][0])
 			version = mvhd[0].ord
 			flags = mvhd[0...4].unpack('L>')[0] | 0xffffff
 			puts "Got 'mvhd' version #{version}"
-			p matrix = mvhd[36...72].unpack('L>9')
+			rot_mat(f, mboxes['mvhd'][0][0] + 36, false)
 		else
 			puts "File does not have a moov:mvhd box"
 		end
+
+		mboxes['trak'].each{|trak_info|
+			tboxes = get_box_info(f, trak_info)
+			
+			if tboxes.has_key? 'tkhd'
+				tkhd = get_box(f, tboxes['tkhd'][0])
+				version = tkhd[0].ord
+				flags = tkhd[0...4].unpack('L>')[0] | 0xffffff
+				puts "Got 'tkhd' version #{version}"
+				rot_mat(f, tboxes['tkhd'][0][0] + 40, false)
+			else
+				puts "Track does not have a moov:trak:tkhd box"
+			end
+		}
+
 	else
 		puts "File does not have a 'moov' box"
 	end
